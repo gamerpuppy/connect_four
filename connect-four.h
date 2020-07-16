@@ -10,7 +10,13 @@
 #include <string>
 #include <sstream>
 #include <iostream>
+#include <algorithm>
 #include <vector>
+#include <cstdio>
+#include <bitset>
+#include <unordered_map>
+
+#include "hash-map.h"
 
 const uint64_t ROW_4_MASK = 0b1000001000001000001;
 const uint64_t ROW_7_MASK = 0b1000001000001000001000001000001000001;
@@ -26,18 +32,36 @@ const uint64_t DN_DIAG_6_MASK = 0b100000010000001000000100000010000001;
 const char PLAYER_1 = 'r';
 const char PLAYER_2 = 'y';
 
-const int PLAYER_1_WIN = 1;
-const int TIE = 0;
-const int PLAYER_2_WIN = -1;
+const int HASH_TABLE_DEPTH = 10;
+const int HASH_TABLE_CAPACITY = 50000;
 
-const uint32_t VOID_MOVE = 8;
-const uint32_t BOARD_COMPLETE = 9;
+static int connectFourHashUses = 0;
+static int connectFourHashInserts = 0;
+static int connectFourHashFailedInserts = 0;
+
+static uint64_t connectFoursEvaluated = 0;
+static uint64_t leafNodesReached = 0;
+
+struct EvaluationPart {
+    int8_t score = 0;
+    uint8_t winIn = 0;
+    EvaluationPart() = default;
+    EvaluationPart(const EvaluationPart &rhs) = default;
+    EvaluationPart(int score, uint32_t winIn);
+};
+
+struct Evaluation {
+    int score;
+    int move;
+    uint32_t winIn;
+
+    Evaluation(int score, int move, uint32_t winIn);
+};
 
 struct Board {
-    uint32_t turn{0};
-    std::array<uint64_t, 2> pieces{0,0};
+    std::array<uint64_t, 2> pieces;
 
-    Board(uint32_t turn, const std::array<uint64_t, 2> &piecesCols);
+    explicit Board(const std::array<uint64_t, 2> &piecesCols);
     Board(const Board &rhs) = default;
 
     Board forMove(uint32_t rIdx, uint32_t cIdx) const;
@@ -48,19 +72,12 @@ struct Board {
     std::string toCfef() const;
     std::string visualRep() const;
 
-
+    int turnCount() const;
     bool isP1Turn() const;
-
+    Evaluation evaluate(int depth);
+    bool doesMoveWin(int move);
+    bool operator==(const Board &rhs) const;
 };
-
-struct Evaluation {
-    int value;
-    std::vector<uint32_t> moves;
-
-    Evaluation(int value, const std::vector<uint32_t> &moves);
-};
-
-Evaluation evaluate(Board b, int depth);
 
 void test();
 

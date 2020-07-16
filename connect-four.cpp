@@ -2,6 +2,7 @@
 // Created by Keegan Millard on 2020-07-08.
 //
 
+#include <c++/4.8.3/chrono>
 #include "connect-four.h"
 
 
@@ -11,21 +12,21 @@ uint32_t getBitIdx(uint32_t rIdx, uint32_t cIdx) {
 }
 
 void setBitAtPos(uint64_t &bits, uint32_t rIdx, uint32_t cIdx) {
-    bits |= (1lu << getBitIdx(rIdx, cIdx));
+    bits |= (1llu << getBitIdx(rIdx, cIdx));
 }
 
 uint64_t getWithSetBit(uint64_t bits, uint32_t rIdx, uint32_t cIdx) {
-    return bits | (1lu << getBitIdx(rIdx, cIdx));
+    return bits | (1llu << getBitIdx(rIdx, cIdx));
 }
 
 bool getBitAtPos(uint64_t bits, uint32_t rIdx, uint32_t cIdx) {
-    return bits & (1lu << getBitIdx(rIdx, cIdx));
+    return bits & (1llu << getBitIdx(rIdx, cIdx));
 }
 
 // Board Bit Manipulation
 
 int getOpenRowIdx(uint32_t col) {
-    return __builtin_ffs(col | 0b1000000)-2;
+    return __builtin_ffs(col | 0b1000000u)-2;
 }
 
 uint64_t getCol(uint64_t pieces, uint32_t cIdx) {
@@ -70,7 +71,7 @@ bool dnDiagHelper(uint64_t pieces, uint32_t offset, uint64_t mask) {
 }
 
 bool dnDiagConnectsFour(uint64_t pieces, uint32_t rIdx, uint32_t cIdx) {
-    int diagIdx = (6-cIdx)+rIdx;
+    uint32_t diagIdx = (6-cIdx)+rIdx;
     switch(diagIdx) {
         case 3: return dnDiagHelper(pieces, 18, DN_DIAG_4_MASK);
         case 4: return dnDiagHelper(pieces, 12, DN_DIAG_5_MASK);
@@ -94,7 +95,7 @@ bool colConnectsFour(uint64_t pieces, uint32_t cIdx) {
 }
 
 bool rowConnectsFour(uint64_t pieces, uint32_t rIdx) {
-    uint32_t row = (pieces >> rIdx) & ROW_7_MASK;
+    uint64_t row = (pieces >> rIdx) & ROW_7_MASK;
     while (row >= ROW_4_MASK) {
         if ((row & ROW_4_MASK) == ROW_4_MASK) {
             return true;
@@ -107,6 +108,7 @@ bool rowConnectsFour(uint64_t pieces, uint32_t rIdx) {
 
 
 bool connectedFour(uint64_t pieces, uint32_t rIdx, uint32_t cIdx) {
+    connectFoursEvaluated++;
     return
         colConnectsFour(pieces, cIdx) ||
         rowConnectsFour(pieces, rIdx) ||
@@ -116,113 +118,16 @@ bool connectedFour(uint64_t pieces, uint32_t rIdx, uint32_t cIdx) {
 
 // evaluation
 
-Evaluation evaluateHelperEndNode(Board b) {
-    Evaluation tieEval(TIE, {});
-
-    uint64_t  combinedPieces = b.pieces[0]|b.pieces[1];
-    for (uint32_t cIdx = 0; cIdx < 7; cIdx++) {
-
-        uint64_t col = getCol(combinedPieces, cIdx);
-        int rIdx = getOpenRowIdx(col);
-        if (rIdx < 0) {
-            continue;
-        }
-
-        if (b.isP1Turn()) {
-            uint64_t piecesAfterMove = getWithSetBit(b.pieces[0], rIdx, cIdx);
-            if (connectedFour(piecesAfterMove, rIdx, cIdx)) {
-                return Evaluation(PLAYER_1_WIN, {cIdx});
-            } else if (tieEval.moves.empty()){
-                tieEval.moves.push_back(cIdx);
-            }
-
-
-        } else {
-            uint64_t piecesAfterMove = getWithSetBit(b.pieces[1], rIdx, cIdx);
-            if (connectedFour(piecesAfterMove, rIdx, cIdx)) {
-                return Evaluation(PLAYER_2_WIN, {cIdx});
-            } else if (tieEval.moves.empty()){
-                tieEval.moves.push_back(cIdx);
-            }
-        }
-    }
-
-    return tieEval;
-}
-
-Evaluation evaluateHelper(Board b, int depth) {
-    if (depth == 1) {
-        return evaluateHelperEndNode(b);
-    }
-
-    Evaluation bestEvaluation(b.isP1Turn() ? PLAYER_2_WIN : PLAYER_1_WIN, {});
-
-    uint64_t  combinedPieces = b.pieces[0]|b.pieces[1];
-    for (uint32_t cIdx = 0; cIdx < 7; cIdx++) {
-
-        uint64_t col = getCol(combinedPieces, cIdx);
-        int rIdx = getOpenRowIdx(col);
-        if (rIdx < 0) {
-            continue;
-        }
-
-        if (b.isP1Turn()) {
-
-            Board boardAfterMove = b.forMove(rIdx, cIdx);
-            if (connectedFour(boardAfterMove.pieces[0], rIdx, cIdx)) {
-                return Evaluation(PLAYER_1_WIN, {cIdx});
-            }
-
-
-            Evaluation eval = evaluateHelper(boardAfterMove, depth - 1);
-            if (eval.value == PLAYER_1_WIN) {
-                eval.moves.push_back(cIdx);
-                return eval;
-            } else if (eval.value > bestEvaluation.value) {
-                eval.moves.push_back(cIdx);
-                bestEvaluation = eval;
-            }
-
-        } else {
-            Board boardAfterMove = b.forMove(rIdx, cIdx);
-            if (connectedFour(boardAfterMove.pieces[1], rIdx, cIdx)) {
-                return Evaluation(PLAYER_2_WIN, {cIdx});
-            }
-
-            Evaluation eval = evaluateHelper(b.forMove(rIdx, cIdx), depth - 1);
-            if (eval.value == PLAYER_2_WIN) {
-                eval.moves.push_back(cIdx);
-                return eval;
-            } else if (eval.value < bestEvaluation.value) {
-                eval.moves.push_back(cIdx);
-                bestEvaluation = eval;
-            }
-
-        }
-
-    }
-
-    if (bestEvaluation.moves.empty()) {
-        bestEvaluation.value = TIE;
-    }
-    return bestEvaluation;
-}
-
-Evaluation evaluate(Board b, int depth) {
-    Evaluation evaluation = evaluateHelper(b, depth);
-    std::reverse(evaluation.moves.begin(), evaluation.moves.end());
-    return evaluation;
-}
 
 // Methods
 
-Board::Board(uint32_t turn, const std::array<uint64_t, 2> &piecesCols) : turn(turn), pieces(piecesCols) {}
+Board::Board(const std::array<uint64_t, 2> &piecesCols) : pieces(piecesCols) {}
 
 Board Board::forMove(uint32_t rIdx, uint32_t cIdx) const {
     if (isP1Turn()) {
-        return Board(turn+1, {getWithSetBit(pieces[0], rIdx, cIdx), pieces[1]});
+        return Board({getWithSetBit(pieces[0], rIdx, cIdx), pieces[1]});
     } else {
-        return Board(turn+1, {pieces[0], getWithSetBit(pieces[1], rIdx, cIdx)});
+        return Board({pieces[0], getWithSetBit(pieces[1], rIdx, cIdx)});
     }
 }
 
@@ -233,7 +138,6 @@ Board Board::forMove(uint32_t cIdx) const {
 
 
 Board Board::fromCfef(const std::string &cfef) {
-    uint32_t turn{0};
     std::array<uint64_t, 2> pieces{0,0};
     uint32_t cIdx = 0;
     std::istringstream ss(cfef);
@@ -244,13 +148,12 @@ Board Board::fromCfef(const std::string &cfef) {
         for (char c : token) {
             int player = c == PLAYER_1 ? 0 : 1;
             setBitAtPos(pieces[player], rIdx, cIdx);
-            turn++;
             rIdx--;
         }
         cIdx++;
     }
 
-    return Board(turn, pieces);
+    return Board(pieces);
 }
 
 std::string Board::toCfef() const {
@@ -296,24 +199,176 @@ std::string Board::visualRep() const {
     return ret;
 }
 
-bool Board::isP1Turn() const {
-    return turn % 2 == 0;
+int Board::turnCount() const {
+    return __builtin_popcountll(pieces[0]|pieces[1]);
 }
 
+bool Board::isP1Turn() const {
+    return turnCount() % 2 == 0;
+}
+
+bool isBetter(const EvaluationPart &p1, const EvaluationPart &p2) {
+    if (p1.score > p2.score) {
+        return true;
+    } else if (p1.score == p2.score) {
+        if (p1.score > 0) {
+            return p1.winIn < p2.winIn;
+        } else {
+            return p1.winIn > p2.winIn;
+        }
+    } else {
+        return false;
+    }
+}
+
+EvaluationPart evaluateHelper(uint64_t piecesTurn, uint64_t piecesOther, int depthRem) {
+    if (depthRem == 0) {
+        leafNodesReached++;
+        return {0,0};
+    }
+
+    uint64_t  combinedPieces = piecesTurn | piecesOther;
+    EvaluationPart best(-2, 0);
+
+    for (uint32_t cIdx = 0; cIdx < 7; cIdx++) {
+        uint64_t col = getCol(combinedPieces, cIdx);
+        int rIdx = getOpenRowIdx(col);
+        if (rIdx < 0) {
+            continue;
+        }
+
+        uint64_t piecesTurnAfter = getWithSetBit(piecesTurn, rIdx, cIdx);
+        if (connectedFour(piecesTurnAfter, rIdx, cIdx)) {
+            return {1,1};
+        }
+        auto res = evaluateHelper(piecesOther, piecesTurnAfter, depthRem-1);
+        res.winIn++;
+        res.score *= -1;
+        if (isBetter(res, best)) {
+            best = res;
+        }
+    }
+
+    return best;
+}
+
+EvaluationPart evaluateHelperHashed(const uint64_t piecesTurn, const uint64_t piecesOther, const int depthRem, const uint32_t hashDepth, const int hashDepthRem, MultiHashMap<EvaluationPart> &table) {
+    if (depthRem == 0) {
+        return {0,0};
+    }
+
+    if (hashDepthRem == 0) {
+        return evaluateHelper(piecesTurn, piecesOther, depthRem);
+    }
+
+    const EvaluationPart* evalPtr = table.get(piecesTurn, piecesOther);
+    if (evalPtr != nullptr) {
+        connectFourHashUses++;
+        return *evalPtr;
+    }
+
+    uint64_t  combinedPieces = piecesTurn | piecesOther;
+    EvaluationPart best(-2, 0);
+
+    for (uint32_t cIdx = 0; cIdx < 7; cIdx++) {
+        uint64_t col = getCol(combinedPieces, cIdx);
+        int rIdx = getOpenRowIdx(col);
+        if (rIdx < 0) {
+            continue;
+        }
+
+        uint64_t piecesTurnAfter = getWithSetBit(piecesTurn, rIdx, cIdx);
+        if (connectedFour(piecesTurnAfter, rIdx, cIdx)) {
+            best = {1,1};
+            break;
+        }
+        auto res = evaluateHelperHashed(piecesOther, piecesTurnAfter, depthRem-1, hashDepth+1, hashDepthRem-1, table);
+        res.winIn++;
+        res.score *= -1;
+        if (isBetter(res, best)) {
+            best = res;
+        }
+    }
+    bool didPut = table.put(piecesTurn, piecesOther, best, hashDepth);
+    if (didPut) {
+        connectFourHashInserts++;
+    } else {
+        connectFourHashFailedInserts++;
+    }
+    return best;
+}
+
+Evaluation Board::evaluate(int depth) {
+    MultiHashMap<EvaluationPart> table(HASH_TABLE_CAPACITY);
+    EvaluationPart best(-2, 0);
+    int bestMove = -1;
+
+    uint64_t piecesTurn = isP1Turn() ? pieces[0] : pieces[1];
+    uint64_t piecesOther = isP1Turn() ? pieces[1] : pieces[0];
+
+    uint64_t  combinedPieces = piecesTurn | piecesOther;
+    for (uint32_t cIdx = 0; cIdx < 7; cIdx++) {
+        uint64_t col = getCol(combinedPieces, cIdx);
+        int rIdx = getOpenRowIdx(col);
+        if (rIdx < 0) {
+            continue;
+        }
+
+        uint64_t piecesTurnAfter = getWithSetBit(piecesTurn, rIdx, cIdx);
+        if (connectedFour(piecesTurnAfter, rIdx, cIdx)) {
+            best = EvaluationPart(1, 1);
+            bestMove = cIdx;
+            break;
+        }
+
+        auto res = evaluateHelperHashed(piecesOther, piecesTurnAfter, depth-1, 1, HASH_TABLE_DEPTH-1, table);
+        res.winIn++;
+        res.score *= -1;
+        if (isBetter(res, best)) {
+            best = res;
+            bestMove = cIdx;
+        }
+    }
+
+    return {best.score, bestMove, best.winIn};
+}
+
+bool Board::doesMoveWin(int move) {
+    int rIdx = getOpenRowIdx(getCol(pieces[0] | pieces[1], move));
+    uint64_t piecesTurnAfter = getWithSetBit(isP1Turn() ? pieces[0] : pieces[1], rIdx, move);
+    return connectedFour(piecesTurnAfter, rIdx, move);
+}
+
+bool Board::operator==(const Board &rhs) const {
+    return pieces == rhs.pieces;
+}
 
 void test() {
-
     std::string cfef1 = "rrry/yr/ry/yry/yyry/yrry/r";
     std::string cfef2 = "r/r/r/r/y/y/y";
     std::string cfef3 = "/ry/yry/ryr/ryr/yrr/yryy";
-    std::string cfef4 = "yy//y/r/r/r/";
+    std::string cfef4 = "yyyry//yr/rr/rr/r/y";
+    std::string cfef5 = "//////";
 
-    Board board = Board::fromCfef(cfef4);
+    Board board = Board::fromCfef(cfef5);
     std::cout << board.visualRep() << std::endl;
 
-    auto eval = evaluate(board, 2);
+    const int depth = 13;
 
-    std::cout << eval.value << std::endl;
+    auto start = std::chrono::high_resolution_clock::now();
+    auto eval = board.evaluate(depth);
+    auto end = std::chrono::high_resolution_clock::now();
+    auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
+
+    std::cout << "depth:" << depth << " move:" << eval.move << " value: " << eval.score << " win in: " << eval.winIn << " millis: " << millis << '\n';
+//    std::cout << "hashTableDepth:" << HASH_TABLE_DEPTH << " hashTableCapacity:" << HASH_TABLE_CAPACITY << " subMapCapacity" << MultiHashMap<int>::SUBMAP_CAPACITY << std::endl;
+    std::cout << "connectFoursEvaluated:" << connectFoursEvaluated << " leafNodesReached:" << leafNodesReached << std::endl;
+    std::cout << "hashTableDepth:" << HASH_TABLE_DEPTH << " hashTableCapacity:" << HASH_TABLE_CAPACITY << std::endl;
+    std::cout << "hashInserts:" << connectFourHashInserts << " failedHashInserts:" << connectFourHashFailedInserts << " hashUses:" << connectFourHashUses << std::endl;
+    std::cout <<  "tooManySubmaps:" << tooManySubmaps << " tooManyEntries:" << tooManyEntries << std::endl;
 }
 
-Evaluation::Evaluation(int value, const std::vector<uint32_t> &moves) : value(value), moves(moves) {}
+EvaluationPart::EvaluationPart(int score, uint32_t winIn) : score(score), winIn(winIn) {}
+
+Evaluation::Evaluation(int score, int move, uint32_t winIn) : score(score), move(move), winIn(winIn) {}
+

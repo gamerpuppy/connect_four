@@ -6,43 +6,44 @@
 void play(std::string cfef, bool playerIsP1, int depth) {
     Board board = Board::fromCfef(cfef);
     std::cout << board.visualRep();
-
     while (true) {
-        if (board.turn > 41) {
+        if (board.turnCount() > 41) {
             return;
         }
         if (board.isP1Turn() == playerIsP1) {
             int move;
             std::cin >> move;
-            board = board.forMove(move);
-            auto eval = evaluate(board, 1);
+            if (board.doesMoveWin(move)) {
+                std::cout << "PLAYER WINS\n";
 
-            if (eval.value != TIE) {
+                std::cout << board.forMove(move).visualRep();
                 return;
             }
+            board = board.forMove(move);
+
 
         } else {
             auto start = std::chrono::high_resolution_clock::now();
-            auto eval = evaluate(board, depth);
+            auto eval = board.evaluate(depth);
             auto end = std::chrono::high_resolution_clock::now();
             auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
 
-            int bestMove = eval.moves[0];
-            std::cout << bestMove << " value: " << eval.value << " millis: " << millis << '\n';
-            board = board.forMove(bestMove);
-            std::cout << board.visualRep();
-            std::cout << board.toCfef()<< std::endl;
+            std::cout << eval.move << " value: " << eval.score << " millis: " << millis << '\n';
 
-            if (eval.value != TIE && eval.moves.size() == 1) {
+            if (board.doesMoveWin(eval.move)) {
+                std::cout << "CPU WINS\n";
+                std::cout << board.forMove(eval.move).visualRep();
                 return;
             }
+            board = board.forMove(eval.move);
+            std::cout << board.visualRep();
+            std::cout << board.toCfef()<< std::endl;
         }
     }
 }
 
-
 int main() {
-//    play("//////", true, 9);
-test();
+//    play("//////", true, 10);
+    test();
     return 0;
 }
