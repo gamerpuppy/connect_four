@@ -298,7 +298,7 @@ EvaluationPart evaluateHelperHashed(const uint64_t piecesTurn, const uint64_t pi
     return best;
 }
 
-Evaluation Board::evaluate(int depth) {
+Evaluation Board::evaluate(uint32_t depth) const {
     MultiHashMap<EvaluationPart> table(HASH_TABLE_CAPACITY);
     EvaluationPart best(-2, 0);
     int bestMove = -1;
@@ -330,8 +330,13 @@ Evaluation Board::evaluate(int depth) {
         }
     }
 
-    return {best.score, bestMove, best.winIn};
+    return {best.score, bestMove, best.winIn, depth};
 }
+
+
+
+
+
 
 bool Board::doesMoveWin(int move) {
     int rIdx = getOpenRowIdx(getCol(pieces[0] | pieces[1], move));
@@ -353,7 +358,7 @@ void test() {
     Board board = Board::fromCfef(cfef5);
     std::cout << board.visualRep() << std::endl;
 
-    const int depth = 13;
+    const int depth = 12;
 
     auto start = std::chrono::high_resolution_clock::now();
     auto eval = board.evaluate(depth);
@@ -368,7 +373,22 @@ void test() {
     std::cout <<  "tooManySubmaps:" << tooManySubmaps << " tooManyEntries:" << tooManyEntries << std::endl;
 }
 
+Evaluation evaluateDynamicDepth(const Board &board, uint64_t msAllowed) {
+    int depth = 5;
+    uint64_t duration = 0;
+    Evaluation evaluation;
+    do {
+        auto start = std::chrono::high_resolution_clock::now();
+        evaluation = board.evaluate(depth);
+        auto end = std::chrono::high_resolution_clock::now();
+        duration = std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
+        depth++;
+    } while (board.turnCount()+depth <= 42 && evaluation.score == 0 && duration * 5 < msAllowed);
+    return evaluation;
+}
+
+
 EvaluationPart::EvaluationPart(int score, uint32_t winIn) : score(score), winIn(winIn) {}
 
-Evaluation::Evaluation(int score, int move, uint32_t winIn) : score(score), move(move), winIn(winIn) {}
+Evaluation::Evaluation(int score, int move, uint32_t winIn, uint32_t depth) : score(score), move(move), winIn(winIn), depth(depth) {}
 

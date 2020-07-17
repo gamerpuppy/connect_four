@@ -24,12 +24,7 @@ private:
         T obj;
 
         Entry(): key(EMPTY) {}
-
         Entry(uint64_t key, const T &obj): key(key), obj(obj) {}
-        Entry& operator=(const Entry &rhs) {
-            key = rhs.key;
-            obj = rhs.obj;
-        }
     };
 
     struct SubMap {
@@ -175,6 +170,11 @@ public:
         delete[] subMaps;
     }
 
+    void printMetrics() {
+
+
+    }
+
     bool put(uint64_t key1, uint64_t key2, const T &obj, uint32_t hashDepth) {
         SubMap* subMapPtr = getOrMakeSubMapForKey(key1, hashDepth);
         if (subMapPtr == nullptr) {
@@ -191,87 +191,6 @@ public:
             return nullptr;
         }
         return subMapPtr->get(key2);
-    }
-
-};
-
-template<class T, size_t cap>
-class MultiHashMap2 {
-private:
-    static const uint32_t EMPTY = 0xFFFFFFFFu;
-    static const uint64_t PRIME1 = 3426051125257;
-    static const uint64_t PRIME2 = 2674691661143;
-    static const uint64_t PRIME3 = 1178781740629;
-
-    struct Entry {
-        uint32_t keyPart1;
-        uint64_t keyPart2;
-        T obj;
-
-        static const uint64_t KEY2_MASK = ~0xFFFFull;
-
-        Entry(): keyPart1(EMPTY), keyPart2(0), obj() {}
-        Entry(uint64_t key1, uint64_t key2, T obj): keyPart1(key1 >> 16u), keyPart2(key1 << 48u | key2), obj() {}
-        Entry(const Entry &rhs): keyPart1(rhs.keyPart1), keyPart2(rhs.keyPart2), obj(rhs.obj) {}
-
-        bool keysEqual(uint64_t key1, uint64_t key2) {
-            uint64_t gKey1 = keyPart1 << 32u | keyPart2 >> 48u;
-            uint64_t gKey2 = keyPart2 & KEY2_MASK;
-            return gKey2 == key2 && gKey1 == key1;
-        }
-
-        bool isEmpty() {
-            return keyPart1 == EMPTY;
-        }
-
-    };
-
-    std::array<Entry, cap> arr;
-    uint64_t size = 0;
-    const uint64_t  maxSize = cap * 0.85;
-
-    size_t getIdxForKeys(uint64_t key1, uint64_t key2) {
-        return (((key1 % PRIME1) + (key2 % PRIME2)) % PRIME3) % cap;
-    }
-
-    // assumes duplicates are not added
-    bool put(uint64_t key1, uint64_t key2, T obj) {
-        if (size >= maxSize) {
-            return false;
-        }
-
-        size_t idx = getIdxForKeys(key1, key2);
-        while (true) {
-            if (idx >= cap) {
-                idx = 0;
-            }
-
-            if (arr[idx].isEmpty()) {
-                arr[idx] = Entry(key1, key2, obj);
-                size++;
-                return true;
-
-            } else {
-                idx++;
-            }
-        }
-    }
-
-    T* get(uint64_t key1, uint64_t key2) {
-        size_t idx = getIdxForKeys(key1, key2);
-        while (true) {
-            if (idx >= cap) {
-                idx = 0;
-            }
-
-            if (arr[idx].isEmpty()) {
-               return nullptr;
-            } else if (arr[idx].keysEqual(key1, key2)) {
-                return &arr[idx].obj;
-            } else {
-                idx++;
-            }
-        }
     }
 
 };

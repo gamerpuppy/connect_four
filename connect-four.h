@@ -54,8 +54,10 @@ struct Evaluation {
     int score;
     int move;
     uint32_t winIn;
+    uint32_t depth;
 
-    Evaluation(int score, int move, uint32_t winIn);
+    Evaluation() = default;
+    Evaluation(int score, int move, uint32_t winIn, uint32_t depth);
 };
 
 struct Board {
@@ -74,10 +76,12 @@ struct Board {
 
     int turnCount() const;
     bool isP1Turn() const;
-    Evaluation evaluate(int depth);
+    Evaluation evaluate(uint32_t depth) const;
     bool doesMoveWin(int move);
     bool operator==(const Board &rhs) const;
 };
+
+Evaluation evaluateDynamicDepth(const Board &board, uint64_t msAllowed);
 
 void test();
 
